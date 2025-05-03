@@ -1,268 +1,307 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Match } from '../types/api';
-import { Calendar, Clock, Timer, Tv } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import format from 'date-fns/format';
+import { Match, MatchDetails } from '../types/api';
 import CachedImage from './CachedImage';
-// import { broadcastService } from '../services/matchBroadcastService'; // Comentado
+import { Star } from 'lucide-react';
 import { matchUrlService } from '../services/matchUrlService';
-import { parseISO } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { format, parseISO } from 'date-fns';
 
-interface MatchCardProps {
-  match: Match;
+interface MatchGridProps {
+  matches: Match[];
 }
 
-export const MatchCard: React.FC<MatchCardProps> = ({ match }) => {
-  // const [broadcast, setBroadcast] = React.useState<string | null>(null); // Comentado
-  const [currentMatch, setCurrentMatch] = React.useState(match);
+// Mapeamento de países para códigos de 2 letras para bandeiras
+const countryCodeMap: Record<string, string> = {
+  'Brazil': 'BR',
+  'Brasil': 'BR',
+  'Argentina': 'AR',
+  'England': 'GB',
+  'Spain': 'ES',
+  'Italy': 'IT',
+  'Germany': 'DE',
+  'France': 'FR',
+  'Portugal': 'PT',
+  'Netherlands': 'NL',
+  'Belgium': 'BE',
+  'Uruguay': 'UY',
+  'Paraguay': 'PY',
+  'Chile': 'CL',
+  'Colombia': 'CO',
+  'Ecuador': 'EC',
+  'Peru': 'PE',
+  'Bolivia': 'BO',
+  'Venezuela': 'VE',
+  'USA': 'US',
+  'Mexico': 'MX',
+  'World': 'WW',   // Para competições internacionais
+};
+
+// Obter código do país para usar na API de bandeiras
+const getCountryCode = (country: string): string => {
+  return countryCodeMap[country] || 'WW'; // Padrão para bandeira genérica
+};
+
+const MatchGrid: React.FC<MatchGridProps> = ({ matches }) => {
   const navigate = useNavigate();
-  const [elapsed, setElapsed] = React.useState<number>(currentMatch.fixture.status?.elapsed || 0);
-  const [localElapsed, setLocalElapsed] = React.useState<number>(currentMatch.fixture.status?.elapsed || 0);
-  const timerRef = React.useRef<ReturnType<typeof setInterval> | undefined>();
-  const lastUpdateRef = React.useRef<number>(Date.now());
-  const matchDate = parseISO(match.fixture.date);
-  const formattedTime = format(matchDate, 'HH:mm');
-  const formattedDate = format(matchDate, 'dd/MM/yyyy');
-  const matchStatus = match.fixture.status.short;
-  const liveStatus = ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'SUSP', 'INT', 'LIVE'];
-  const finishedStatus = ['FT', 'AET', 'PEN'];
-  const isLive = liveStatus.includes(matchStatus);
-  const isFinished = finishedStatus.includes(matchStatus);
-  const notStarted = matchStatus === 'NS';
 
-  const homeTeam = match.teams.home;
-  const awayTeam = match.teams.away;
+  // Função para agrupar os jogos por liga
+  const groupMatchesByLeague = (matches: Match[]) => {
+    const mainLeaguesIds = [
+      2,    // UEFA Champions League
+      39,   // Premier League (Inglaterra)
+      140,  // La Liga (Espanha)
+      135,  // Serie A (Itália)
+      78,   // Bundesliga (Alemanha)
+      61,   // Ligue 1 (França)
+      3,    // UEFA Europa League
+      13,   // Copa Libertadores
+      14,   // Copa Sudamericana
+      1,    // Copa do Mundo
+    ];
 
-  const updateMatchData = React.useCallback(async () => {
-    // Atualiza apenas se passaram 5 minutos desde a última atualização
-    const now = Date.now();
-    if (now - lastUpdateRef.current < 5 * 60 * 1000) {
-      return;
-    }
+    const grouped: Record<string, { 
+      name: string, 
+      logo: string, 
+      country: string,
+      matches: Match[],
+      order: number 
+    }> = {};
     
-    lastUpdateRef.current = now;
-    
-    try {
-      const url = new URL('https://v3.football.api-sports.io/fixtures');
-      url.searchParams.append('id', currentMatch.fixture.id.toString());
-      url.searchParams.append('timezone', 'America/Sao_Paulo');
-
-      const response = await fetch(
-        url.toString(),
-        {
-          method: 'GET',
-          headers: {
-            'x-apisports-key': import.meta.env.VITE_API_SPORTS_KEY,
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
+    matches.forEach(match => {
+      const leagueName = match.league.name;
+      const key = `${match.league.country}-${leagueName}`;
+      
+      if (!grouped[key]) {
+        // Define a ordem de prioridade da liga
+        let order = 3; // Padrão para outras ligas
+        
+        // Verifica se é uma liga brasileira
+        if (match.league.country.toLowerCase() === 'brazil') {
+          order = 1; // Ligas brasileiras têm prioridade 1
+        } 
+        // Verifica se é uma liga principal
+        else if ((match.league as any).id && mainLeaguesIds.includes((match.league as any).id)) {
+          order = 2; // Ligas principais têm prioridade 2
         }
-      );
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        
+        grouped[key] = {
+          name: leagueName,
+          logo: match.league.logo,
+          country: match.league.country,
+          matches: [],
+          order: order
+        };
       }
       
-      const data = await response.json();
-      if (data.response?.[0]) {
-        setCurrentMatch(data.response[0]);
-        const newElapsed = data.response[0].fixture.status?.elapsed || elapsed;
-        setElapsed(newElapsed);
-        setLocalElapsed(newElapsed);
+      grouped[key].matches.push(match);
+    });
+    
+    // Converter para array e ordenar por prioridade (brasileiras, principais, outras)
+    // e depois por nome da liga dentro de cada categoria
+    return Object.values(grouped).sort((a, b) => {
+      // Primeiro por ordem de prioridade
+      if (a.order !== b.order) {
+        return a.order - b.order;
       }
-    } catch (error) {
-      console.error('Error updating match data:', error instanceof Error ? error.message : 'Unknown error');
-    }
-  }, [currentMatch.fixture.id, elapsed]);
-
-  // Update elapsed time locally
-  React.useEffect(() => {
-    if (isLive && currentMatch.fixture.status.short !== 'HT') {
-      // Limpa o timer anterior se existir
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
+      // Depois por país
+      if (a.country !== b.country) {
+        return a.country.localeCompare(b.country);
       }
-
-      // Atualiza o tempo a cada minuto
-      timerRef.current = setInterval(() => {
-        setLocalElapsed(prev => (prev || 0) + 1);
-      }, 60000);
-    }
-
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    };
-  }, [isLive, currentMatch.fixture.status.short]);
-
-  // Fetch match data from API periodically
-  React.useEffect(() => {
-    let dataInterval: ReturnType<typeof setInterval> | undefined;
-
-    if (isLive) {
-      // Atualização inicial
-      updateMatchData();
-      
-      // Configura intervalo para verificar atualizações a cada minuto
-      // O updateMatchData só fará a requisição se passaram 5 minutos
-      dataInterval = setInterval(updateMatchData, 60000);
-    }
-
-    return () => {
-      if (dataInterval) {
-        clearInterval(dataInterval);
-      }
-    };
-  }, [isLive, updateMatchData]);
-
-  // React.useEffect(() => { // Comentado
-  //   if (match.fixture.id) {
-  //     const fetchBroadcast = async () => {
-  //       const info = await broadcastService.findBroadcastInfo(
-  //         homeTeam.name,
-  //         awayTeam.name,
-  //         match.fixture.venue.name ?? ''
-  //       );
-  //       setBroadcast(info);
-  //     };
-  //     fetchBroadcast();
-  //   }
-  // }, [match.fixture.id, homeTeam.name, awayTeam.name, match.fixture.venue.name]); // Comentado
-
-  const renderMatchTime = () => {
-    if (!isLive) return null;
-    if (currentMatch.fixture.status.short === 'HT') return 'Intervalo';
-    return 'Ao Vivo';
+      // Por fim, pelo nome da liga
+      return a.name.localeCompare(b.name);
+    });
   };
 
-  const generateMatchUrl = () => {
-    const date = format(matchDate, 'dd-MM-yyyy');
-    return matchUrlService.generateMatchUrl(
-      currentMatch.league.name,
-      currentMatch.teams.home.name,
-      currentMatch.teams.away.name,
-      date,
-      currentMatch.fixture.id
+  const renderElapsedTime = (match: Match) => {
+    const status = match.fixture.status.short;
+    
+    // Para jogos ao vivo
+    if (['1H', '2H', 'ET', 'BT', 'P', 'LIVE'].includes(status)) {
+      // Verificar se a propriedade elapsed existe no objeto status
+      const elapsed = (match.fixture.status as any).elapsed || 0;
+      
+      return (
+        <span className="text-red-500 font-semibold text-sm whitespace-nowrap">
+          {elapsed}'
+        </span>
+      );
+    }
+    
+    // Para intervalo
+    if (status === 'HT') {
+      return <span className="text-red-500 font-semibold text-sm whitespace-nowrap">HT</span>;
+    }
+    
+    // Para jogos programados
+    if (['NS', 'TBD'].includes(status)) {
+      const matchDate = parseISO(match.fixture.date);
+      return <span className="text-gray-600 dark:text-gray-400 text-sm whitespace-nowrap">{format(matchDate, 'HH:mm')}</span>;
+    }
+    
+    // Para jogos finalizados
+    return <span className="text-gray-600 dark:text-gray-400 text-sm whitespace-nowrap">FT</span>;
+  };
+
+  const renderStat = (match: Match) => {
+    // Aleatoriamente escolhe entre os formatos disponíveis na imagem para simular
+    const stats = ['1-1', '0-1', '5-1', '0-3', '6-0', '20-1', '1-3', '3-3'];
+    const randomIndex = Math.floor(Math.random() * stats.length);
+    
+    return (
+      <div className="px-2 flex items-center text-xs whitespace-nowrap">
+        {stats[randomIndex]}
+      </div>
     );
   };
 
+  const renderOdds = (match: Match) => {
+    // Usar odds reais da API se disponíveis
+    // Verificar se temos odds disponíveis (o match pode ser um MatchDetails que tem odds)
+    const matchWithOdds = match as Partial<MatchDetails>;
+    
+    // Se não houver odds disponíveis ou não for um MatchDetails, mostramos valores padrão
+    if (!matchWithOdds.odds || !matchWithOdds.odds.bookmakers || !matchWithOdds.odds.bookmakers.length) {
+      return (
+        <div className="flex space-x-2 text-sm">
+          <div className="w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">-</div>
+          <div className="w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">-</div>
+          <div className="w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">-</div>
+        </div>
+      );
+    }
+    
+    // Tentar encontrar a aposta para o resultado da partida (1X2)
+    const bookmaker = matchWithOdds.odds.bookmakers[0]; // Pega o primeiro bookmaker
+    const bet = bookmaker.bets.find(bet => bet.name === '1X2' || bet.name === 'Match Winner');
+    
+    if (!bet || !bet.values || bet.values.length < 3) {
+      return (
+        <div className="flex space-x-2 text-sm">
+          <div className="w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">-</div>
+          <div className="w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">-</div>
+          <div className="w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">-</div>
+        </div>
+      );
+    }
+    
+    // Extrai os valores das odds
+    const homeOdd = bet.values.find(v => v.value === 'Home')?.odd || "-";
+    const drawOdd = bet.values.find(v => v.value === 'Draw')?.odd || "-";
+    const awayOdd = bet.values.find(v => v.value === 'Away')?.odd || "-";
+    
+    return (
+      <div className="flex space-x-2 text-sm">
+        <div className="w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">
+          {homeOdd}
+        </div>
+        <div className="w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">
+          {drawOdd}
+        </div>
+        <div className="w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">
+          {awayOdd}
+        </div>
+      </div>
+    );
+  };
+
+  const generateMatchUrl = (match: Match) => {
+    const matchDate = parseISO(match.fixture.date);
+    const date = format(matchDate, 'dd-MM-yyyy');
+    return matchUrlService.generateMatchUrl(
+      match.league.name,
+      match.teams.home.name,
+      match.teams.away.name,
+      date,
+      match.fixture.id
+    );
+  };
+
+  const groupedMatches = groupMatchesByLeague(matches);
+
   return (
-    <Link 
-      to={generateMatchUrl()}
-      className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-3 sm:p-4 hover:shadow-lg transition-shadow cursor-pointer"
-    >
-      <div className="flex items-center justify-between mb-3 sm:mb-4">
-        <div className="flex items-center space-x-2">
-          <Calendar className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500 dark:text-gray-400" />
-          <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-300">
-            {format(matchDate, 'dd MMM yyyy')}
-          </span>
-        </div>
-        <div className="flex items-center space-x-2">
-          {isLive ? (
-            <div className="flex items-center space-x-2 text-red-500">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-              </span>
-              <span className="text-xs sm:text-sm font-medium whitespace-nowrap">
-                {renderMatchTime()}
+    <div className="space-y-4">
+      {/* Lista de jogos por liga */}
+      {groupedMatches.map((league) => (
+        <div key={`${league.country}-${league.name}`} className="rounded-lg overflow-hidden bg-white dark:bg-gray-800 shadow">
+          {/* Cabeçalho da liga */}
+          <div className="flex items-center p-3 bg-blue-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+            <Star className="w-5 h-5 text-amber-400 mr-2" />
+            <div className="flex items-center">
+              <img 
+                src={`https://flagsapi.com/${getCountryCode(league.country)}/flat/16.png`} 
+                alt={league.country} 
+                className="w-4 h-4 mr-2"
+              />
+              <span className="font-medium text-gray-800 dark:text-white">
+                {league.country}: {league.name}
               </span>
             </div>
-          ) : (
-            <>
-              <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500 dark:text-gray-400" />
-              <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-300">
-                {format(matchDate, 'HH:mm')}
-              </span>
-            </>
-          )}
-        </div>
-      </div>
-      {/* Broadcast Info - Comentado */}
-      {/* {broadcast && (
-        <div className="flex items-center justify-center gap-2 mb-3">
-          <Tv className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500 dark:text-gray-400" />
-          <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-300">
-            {broadcast}
-          </span>
-        </div>
-      )} */}
-
-      <div className="grid grid-cols-[1fr,auto,1fr] gap-3">
-        <div className="flex items-center gap-3">
-          <div
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/team/${currentMatch.teams.home.id}`);
-            }}
-            className="cursor-pointer hover:opacity-80 transition-opacity"
-          >
-            <CachedImage 
-              src={currentMatch.teams.home.logo} 
-              alt={currentMatch.teams.home.name} 
-              className="w-6 h-6 sm:w-8 sm:h-8 object-contain bg-transparent" 
-              fallbackSize="sm"
-            />
-          </div>
-          <span 
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/team/${currentMatch.teams.home.id}`);
-            }}
-            className="text-sm sm:text-base font-medium dark:text-white line-clamp-1 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-          >
-            {currentMatch.teams.home.name}
-          </span>
-        </div>
-        <div className="flex flex-col items-center self-center mt-3">
-          <div className="text-lg sm:text-xl font-bold dark:text-white">
-            <span className="inline-block min-w-[10px] text-center">{currentMatch.goals.home ?? '-'}</span>
-            <span className="mx-1">-</span>
-            <span className="inline-block min-w-[10px] text-center">{currentMatch.goals.away ?? '-'}</span>
-          </div>
-          {isLive && currentMatch.fixture.status.short !== 'HT' && (
-            <div className="text-xs text-red-500 whitespace-nowrap mt-0.5">
-              <Timer className="w-3 h-3 inline-block mr-1" />
-              <span>{localElapsed}'</span>
+            <div className="ml-auto flex items-center space-x-6">
+              <span className="text-orange-500 font-bold">9999</span>
+              <span>1</span>
+              <span>X</span>
+              <span>2</span>
             </div>
-          )}
-        </div>
-        <div className="flex items-center justify-end gap-3">
-          <span 
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/team/${currentMatch.teams.away.id}`);
-            }}
-            className="text-sm sm:text-base font-medium dark:text-white text-right line-clamp-1 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-          >
-            {currentMatch.teams.away.name}
-          </span>
-          <div
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/team/${currentMatch.teams.away.id}`);
-            }}
-            className="cursor-pointer hover:opacity-80 transition-opacity"
-          >
-            <CachedImage 
-              src={currentMatch.teams.away.logo} 
-              alt={currentMatch.teams.away.name} 
-              className="w-6 h-6 sm:w-8 sm:h-8 object-contain bg-transparent" 
-              fallbackSize="sm"
-            />
+          </div>
+          
+          {/* Lista de jogos */}
+          <div>
+            {league.matches.map((match) => (
+              <div 
+                key={match.fixture.id}
+                onClick={() => navigate(generateMatchUrl(match))}
+                className="grid grid-cols-[auto,auto,1fr,auto,auto,auto] items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-600 cursor-pointer"
+              >
+                <div className="flex items-center">
+                  <Star className="w-5 h-5 text-gray-300 hover:text-amber-400" />
+                </div>
+                
+                <div className="text-sm text-gray-500 dark:text-gray-400 min-w-[40px] text-center">
+                  {renderElapsedTime(match)}
+                </div>
+                
+                <div className="grid grid-cols-[1fr,auto,1fr] gap-2 items-center">
+                  <div className="flex items-center gap-2 justify-end">
+                    <div className="text-right font-medium dark:text-white truncate">{match.teams.home.name}</div>
+                    <CachedImage
+                      src={match.teams.home.logo}
+                      alt={match.teams.home.name}
+                      className="w-5 h-5 object-contain"
+                      fallbackSize="sm"
+                    />
+                  </div>
+                  
+                  <div className="font-bold flex justify-center min-w-[40px]">
+                    {match.goals.home ?? '-'} - {match.goals.away ?? '-'}
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <CachedImage
+                      src={match.teams.away.logo}
+                      alt={match.teams.away.name}
+                      className="w-5 h-5 object-contain"
+                      fallbackSize="sm"
+                    />
+                    <div className="font-medium dark:text-white truncate">{match.teams.away.name}</div>
+                  </div>
+                </div>
+                
+                <div className="text-gray-500 dark:text-gray-400 flex items-center">
+                  {renderStat(match)}
+                </div>
+                
+                <div className="w-6 h-6 rounded-full bg-yellow-500 flex items-center justify-center">
+                  <span className="text-white text-xs">!</span>
+                </div>
+                
+                {renderOdds(match)}
+              </div>
+            ))}
           </div>
         </div>
-      </div>
-
-      <div className="mt-3 sm:mt-4 flex items-center justify-center">
-        <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 text-center line-clamp-1">
-          {currentMatch.league.name} • {currentMatch.fixture.venue.name}
-        </span>
-      </div>
-    </Link>
+      ))}
+    </div>
   );
 };
+
+export default MatchGrid; 
