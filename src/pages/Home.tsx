@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getMatchesByDate, getLiveMatches, getTomorrowMatches } from '../services/api';
 import { Match } from '../types/api';
-import { MatchCard } from '../components/MatchCard';
 import { Loader2 } from 'lucide-react';
 import subHours from 'date-fns/subHours';
+import MatchGrid from '../components/MatchGrid';
 
 export const Home: React.FC = () => {
   const [matches, setMatches] = useState<Match[]>([]);
@@ -126,65 +126,6 @@ export const Home: React.FC = () => {
     }
   };
 
-  // Função para agrupar os jogos por liga
-  const groupMatchesByLeague = (matches: Match[]) => {
-    const mainLeaguesIds = [
-      2,    // UEFA Champions League
-      39,   // Premier League (Inglaterra)
-      140,  // La Liga (Espanha)
-      135,  // Serie A (Itália)
-      78,   // Bundesliga (Alemanha)
-      61,   // Ligue 1 (França)
-      3,    // UEFA Europa League
-      13,   // Copa Libertadores
-      14,   // Copa Sudamericana
-      1,    // Copa do Mundo
-    ];
-
-    const grouped: Record<string, { name: string, logo: string, matches: Match[], order: number }> = {};
-    
-    matches.forEach(match => {
-      const leagueName = match.league.name;
-      const key = leagueName;
-      
-      if (!grouped[key]) {
-        // Define a ordem de prioridade da liga
-        let order = 3; // Padrão para outras ligas
-        
-        // Verifica se é uma liga principal
-        // @ts-ignore - Verificamos apenas pelo nome da liga, pois o id pode não existir na interface
-        const leagueId = match.league.id;
-        if (leagueId && mainLeaguesIds.includes(leagueId)) {
-          order = 1; // Ligas principais têm prioridade 1
-        } 
-        // Verifica se é uma liga brasileira
-        else if (match.league.country.toLowerCase() === 'brazil') {
-          order = 2; // Ligas brasileiras têm prioridade 2
-        }
-        
-        grouped[key] = {
-          name: leagueName,
-          logo: match.league.logo,
-          matches: [],
-          order: order
-        };
-      }
-      
-      grouped[key].matches.push(match);
-    });
-    
-    // Converte para um array e ordena primeiro por ordem (principais, brasileiras, outras)
-    // e depois por nome da liga dentro de cada categoria
-    return Object.entries(grouped)
-      .map(([_, leagueData]) => leagueData)
-      .sort((a, b) => {
-        if (a.order !== b.order) {
-          return a.order - b.order;
-        }
-        return a.name.localeCompare(b.name);
-      });
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen dark:bg-gray-900">
@@ -193,10 +134,8 @@ export const Home: React.FC = () => {
     );
   }
 
-  const groupedMatches = groupMatchesByLeague(matches);
-
   return (
-    <div className="container px-4 py-4 md:px-6 lg:px-8 lg:pr-12 md:ml-0">
+    <div className="container px-4 py-4 md:px-6 lg:px-8">
       <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 text-center dark:text-white">
         {getPageTitle()}
       </h1>
@@ -205,23 +144,7 @@ export const Home: React.FC = () => {
           Nenhuma partida encontrada
         </div>
       ) : (
-        <div className="space-y-6">
-          {groupedMatches.map((league) => (
-            <div key={league.name} className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-              <div className="p-3 sm:p-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 flex items-center">
-                {league.logo && (
-                  <img src={league.logo} alt={league.name} className="w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3" />
-                )}
-                <h2 className="text-base sm:text-lg font-bold text-gray-800 dark:text-white">{league.name}</h2>
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 p-3 sm:p-4">
-                {league.matches.map((match) => (
-                  <MatchCard key={match.fixture.id} match={match} />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+        <MatchGrid matches={matches} />
       )}
     </div>
   );
