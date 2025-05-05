@@ -121,7 +121,7 @@ const MatchGrid: React.FC<MatchGridProps> = ({ matches }) => {
       const elapsed = (match.fixture.status as any).elapsed || 0;
       
       return (
-        <span className="text-red-500 font-semibold text-sm whitespace-nowrap">
+        <span className="text-red-500 font-semibold text-xs sm:text-sm whitespace-nowrap">
           {elapsed}'
         </span>
       );
@@ -129,17 +129,17 @@ const MatchGrid: React.FC<MatchGridProps> = ({ matches }) => {
     
     // Para intervalo
     if (status === 'HT') {
-      return <span className="text-red-500 font-semibold text-sm whitespace-nowrap">HT</span>;
+      return <span className="text-red-500 font-semibold text-xs sm:text-sm whitespace-nowrap">HT</span>;
     }
     
     // Para jogos programados
     if (['NS', 'TBD'].includes(status)) {
       const matchDate = parseISO(match.fixture.date);
-      return <span className="text-gray-600 dark:text-gray-400 text-sm whitespace-nowrap">{format(matchDate, 'HH:mm')}</span>;
+      return <span className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm whitespace-nowrap">{format(matchDate, 'HH:mm')}</span>;
     }
     
     // Para jogos finalizados
-    return <span className="text-gray-600 dark:text-gray-400 text-sm whitespace-nowrap">FT</span>;
+    return <span className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm whitespace-nowrap">FT</span>;
   };
 
   const renderStat = (match: Match) => {
@@ -148,24 +148,23 @@ const MatchGrid: React.FC<MatchGridProps> = ({ matches }) => {
     const randomIndex = Math.floor(Math.random() * stats.length);
     
     return (
-      <div className="px-2 flex items-center text-xs whitespace-nowrap">
+      <div className="px-1 sm:px-2 flex items-center text-xs whitespace-nowrap">
         {stats[randomIndex]}
       </div>
     );
   };
 
   const renderOdds = (match: Match) => {
-    // Usar odds reais da API se disponíveis
     // Verificar se temos odds disponíveis (o match pode ser um MatchDetails que tem odds)
     const matchWithOdds = match as Partial<MatchDetails>;
     
     // Se não houver odds disponíveis ou não for um MatchDetails, mostramos valores padrão
     if (!matchWithOdds.odds || !matchWithOdds.odds.bookmakers || !matchWithOdds.odds.bookmakers.length) {
       return (
-        <div className="flex space-x-2 text-sm">
-          <div className="w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">-</div>
-          <div className="w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">-</div>
-          <div className="w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">-</div>
+        <div className="flex space-x-1 sm:space-x-2 text-xs sm:text-sm">
+          <div className="w-8 sm:w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">-</div>
+          <div className="w-8 sm:w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">-</div>
+          <div className="w-8 sm:w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">-</div>
         </div>
       );
     }
@@ -176,10 +175,10 @@ const MatchGrid: React.FC<MatchGridProps> = ({ matches }) => {
     
     if (!bet || !bet.values || bet.values.length < 3) {
       return (
-        <div className="flex space-x-2 text-sm">
-          <div className="w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">-</div>
-          <div className="w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">-</div>
-          <div className="w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">-</div>
+        <div className="flex space-x-1 sm:space-x-2 text-xs sm:text-sm">
+          <div className="w-8 sm:w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">-</div>
+          <div className="w-8 sm:w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">-</div>
+          <div className="w-8 sm:w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">-</div>
         </div>
       );
     }
@@ -190,14 +189,14 @@ const MatchGrid: React.FC<MatchGridProps> = ({ matches }) => {
     const awayOdd = bet.values.find(v => v.value === 'Away')?.odd || "-";
     
     return (
-      <div className="flex space-x-2 text-sm">
-        <div className="w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">
+      <div className="flex space-x-1 sm:space-x-2 text-xs sm:text-sm">
+        <div className="w-8 sm:w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">
           {homeOdd}
         </div>
-        <div className="w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">
+        <div className="w-8 sm:w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">
           {drawOdd}
         </div>
-        <div className="w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">
+        <div className="w-8 sm:w-10 text-center rounded py-1 bg-gray-100 dark:bg-gray-700">
           {awayOdd}
         </div>
       </div>
@@ -219,24 +218,24 @@ const MatchGrid: React.FC<MatchGridProps> = ({ matches }) => {
   const groupedMatches = groupMatchesByLeague(matches);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {/* Lista de jogos por liga */}
       {groupedMatches.map((league) => (
         <div key={`${league.country}-${league.name}`} className="rounded-lg overflow-hidden bg-white dark:bg-gray-800 shadow">
           {/* Cabeçalho da liga */}
-          <div className="flex items-center p-3 bg-blue-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-            <Star className="w-5 h-5 text-amber-400 mr-2" />
+          <div className="flex items-center p-2 sm:p-3 bg-blue-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+            <Star className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400 mr-1 sm:mr-2" />
             <div className="flex items-center">
               <img 
                 src={`https://flagsapi.com/${getCountryCode(league.country)}/flat/16.png`} 
                 alt={league.country} 
-                className="w-4 h-4 mr-2"
+                className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2"
               />
-              <span className="font-medium text-gray-800 dark:text-white">
+              <span className="text-sm sm:text-base font-medium text-gray-800 dark:text-white">
                 {league.country}: {league.name}
               </span>
             </div>
-            <div className="ml-auto flex items-center space-x-6">
+            <div className="ml-auto hidden md:flex items-center space-x-4 lg:space-x-6">
               <span className="text-orange-500 font-bold">9999</span>
               <span>1</span>
               <span>X</span>
@@ -250,51 +249,57 @@ const MatchGrid: React.FC<MatchGridProps> = ({ matches }) => {
               <div 
                 key={match.fixture.id}
                 onClick={() => navigate(generateMatchUrl(match))}
-                className="grid grid-cols-[auto,auto,1fr,auto,auto,auto] items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-600 cursor-pointer"
+                className="grid grid-cols-[auto,auto,1fr,auto] md:grid-cols-[auto,auto,1fr,auto,auto,auto] items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-600 cursor-pointer"
               >
                 <div className="flex items-center">
-                  <Star className="w-5 h-5 text-gray-300 hover:text-amber-400" />
+                  <Star className="w-4 h-4 sm:w-5 sm:h-5 text-gray-300 hover:text-amber-400" />
                 </div>
                 
-                <div className="text-sm text-gray-500 dark:text-gray-400 min-w-[40px] text-center">
+                <div className="text-gray-500 dark:text-gray-400 min-w-[30px] sm:min-w-[40px] text-center">
                   {renderElapsedTime(match)}
                 </div>
                 
-                <div className="grid grid-cols-[1fr,auto,1fr] gap-2 items-center">
-                  <div className="flex items-center gap-2 justify-end">
-                    <div className="text-right font-medium dark:text-white truncate">{match.teams.home.name}</div>
+                <div className="grid grid-cols-[minmax(0,1fr),auto,minmax(0,1fr)] gap-1 sm:gap-2 items-center">
+                  <div className="flex items-center gap-1 sm:gap-2 justify-end">
+                    <div className="text-right text-xs sm:text-sm font-medium dark:text-white truncate max-w-[65px] sm:max-w-none">
+                      {match.teams.home.name}
+                    </div>
                     <CachedImage
                       src={match.teams.home.logo}
                       alt={match.teams.home.name}
-                      className="w-5 h-5 object-contain"
+                      className="w-4 h-4 sm:w-5 sm:h-5 object-contain flex-shrink-0"
                       fallbackSize="sm"
                     />
                   </div>
                   
-                  <div className="font-bold flex justify-center min-w-[40px]">
+                  <div className="font-bold text-xs sm:text-sm flex justify-center min-w-[28px] sm:min-w-[40px]">
                     {match.goals.home ?? '-'} - {match.goals.away ?? '-'}
                   </div>
                   
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 sm:gap-2">
                     <CachedImage
                       src={match.teams.away.logo}
                       alt={match.teams.away.name}
-                      className="w-5 h-5 object-contain"
+                      className="w-4 h-4 sm:w-5 sm:h-5 object-contain flex-shrink-0"
                       fallbackSize="sm"
                     />
-                    <div className="font-medium dark:text-white truncate">{match.teams.away.name}</div>
+                    <div className="text-xs sm:text-sm font-medium dark:text-white truncate max-w-[65px] sm:max-w-none">
+                      {match.teams.away.name}
+                    </div>
                   </div>
                 </div>
                 
-                <div className="text-gray-500 dark:text-gray-400 flex items-center">
+                <div className="text-gray-500 dark:text-gray-400 flex items-center sm:block hidden">
                   {renderStat(match)}
                 </div>
                 
-                <div className="w-6 h-6 rounded-full bg-yellow-500 flex items-center justify-center">
+                <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-yellow-500 hidden md:flex items-center justify-center">
                   <span className="text-white text-xs">!</span>
                 </div>
                 
-                {renderOdds(match)}
+                <div className="hidden md:flex">
+                  {renderOdds(match)}
+                </div>
               </div>
             ))}
           </div>
